@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notion Style Task Manager</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        body { 
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif; 
+            margin: 0;
+            overflow: hidden;
+        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Notion-like content editable styles */
+        .block-placeholder:empty:before {
+            content: attr(data-placeholder);
+            color: #9ca3af;
+            cursor: text;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- Components ---
+
+        // 1. Sidebar Component
+        const Sidebar = () => (
+            <div className="w-64 h-screen bg-[#f7f7f5] flex flex-col border-r border-gray-200 text-[#37352f] text-sm shrink-0 hover:overflow-y-auto hide-scrollbar transition-all">
+                {/* Workspace Profile */}
+                <div className="flex items-center p-3 hover:bg-gray-200 cursor-pointer transition-colors m-1 rounded">
+                    <div className="w-5 h-5 bg-blue-500 rounded flex items-center justify-center text-white font-bold text-xs mr-2">W</div>
+                    <span className="font-semibold truncate">Workspace</span>
+                </div>
+
+                {/* Quick Links */}
+                <div className="px-3 mb-4 space-y-0.5">
+                    <div className="flex items-center p-1.5 hover:bg-gray-200 cursor-pointer rounded text-gray-600">
+                        <i data-lucide="search" className="w-4 h-4 mr-2"></i> 검색
+                    </div>
+                    <div className="flex items-center p-1.5 hover:bg-gray-200 cursor-pointer rounded text-gray-600">
+                        <i data-lucide="clock" className="w-4 h-4 mr-2"></i> 업데이트
+                    </div>
+                    <div className="flex items-center p-1.5 hover:bg-gray-200 cursor-pointer rounded text-gray-600">
+                        <i data-lucide="settings" className="w-4 h-4 mr-2"></i> 설정 및 멤버
+                    </div>
+                </div>
+
+                {/* Pages List */}
+                <div className="px-3">
+                    <div className="text-xs font-semibold text-gray-500 mb-1 px-1 group flex justify-between items-center">
+                        개인 페이지
+                        <i data-lucide="plus" className="w-3 h-3 opacity-0 group-hover:opacity-100 cursor-pointer"></i>
+                    </div>
+                    <div className="flex items-center p-1.5 bg-gray-200 cursor-pointer rounded font-medium">
+                        <span className="mr-2">📝</span> 과제 관리 시스템 구축
+                    </div>
+                    <div className="flex items-center p-1.5 hover:bg-gray-200 cursor-pointer rounded text-gray-600">
+                        <span className="mr-2">🎯</span> 2026년 목표 트래킹
+                    </div>
+                    <div className="flex items-center p-1.5 hover:bg-gray-200 cursor-pointer rounded text-gray-600">
+                        <span className="mr-2">💡</span> 아이디어 노트
+                    </div>
+                </div>
+
+                {/* Bottom section */}
+                <div className="mt-auto p-3 border-t border-gray-200">
+                    <div className="flex items-center p-1.5 hover:bg-gray-200 cursor-pointer rounded text-gray-600">
+                        <i data-lucide="plus" className="w-4 h-4 mr-2"></i> 새 페이지
+                    </div>
+                </div>
+            </div>
+        );
+
+        // 2. Kanban Board Component (Task Management Block)
+        const KanbanBoard = () => {
+            const initialTasks = {
+                todo: [
+                    { id: 1, content: "UX/UI 와이어프레임 설계", tag: "Design", color: "bg-pink-100 text-pink-700" },
+                    { id: 2, content: "DB 스키마 모델링", tag: "Backend", color: "bg-blue-100 text-blue-700" }
+                ],
+                inProgress: [
+                    { id: 3, content: "React 프론트엔드 환경 세팅", tag: "Frontend", color: "bg-yellow-100 text-yellow-700" },
+                    { id: 4, content: "칸반 보드 컴포넌트 개발", tag: "Frontend", color: "bg-yellow-100 text-yellow-700" }
+                ],
+                done: [
+                    { id: 5, content: "요구사항 정의서 작성", tag: "Planning", color: "bg-green-100 text-green-700" }
+                ]
+            };
+
+            const Column = ({ title, tasks, badgeColor }) => (
+                <div className="flex-1 bg-white border border-gray-200 rounded-lg p-3 shrink-0 min-w-[250px] shadow-sm">
+                    <div className="flex items-center mb-3">
+                        <span className={`w-2 h-2 rounded-full ${badgeColor} mr-2`}></span>
+                        <h3 className="font-semibold text-gray-700 text-sm">{title}</h3>
+                        <span className="ml-2 text-xs text-gray-400 bg-gray-100 px-1.5 rounded">{tasks.length}</span>
+                    </div>
+                    <div className="space-y-2">
+                        {tasks.map(task => (
+                            <div key={task.id} className="p-3 bg-white border border-gray-200 rounded shadow-sm hover:shadow-md transition-shadow cursor-grab group">
+                                <p className="text-sm text-gray-800 mb-2">{task.content}</p>
+                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${task.color}`}>
+                                    {task.tag}
+                                </span>
+                            </div>
+                        ))}
+                        <div className="text-gray-400 text-sm hover:bg-gray-100 p-1.5 rounded cursor-pointer flex items-center transition-colors">
+                            <i data-lucide="plus" className="w-3 h-3 mr-1"></i> 새로 만들기
+                        </div>
+                    </div>
+                </div>
+            );
+
+            return (
+                <div className="mt-8">
+                    <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                        <i data-lucide="kanban-square" className="w-5 h-5 mr-2 text-gray-500"></i>
+                        스프린트 백로그
+                    </h2>
+                    <div className="flex space-x-4 overflow-x-auto pb-4 hide-scrollbar">
+                        <Column title="시작 전 (To Do)" tasks={initialTasks.todo} badgeColor="bg-gray-400" />
+                        <Column title="진행 중 (In Progress)" tasks={initialTasks.inProgress} badgeColor="bg-blue-500" />
+                        <Column title="완료 (Done)" tasks={initialTasks.done} badgeColor="bg-green-500" />
+                    </div>
+                </div>
+            );
+        };
+
+        // 3. Main Editor Area
+        const Editor = () => {
+            useEffect(() => {
+                lucide.createIcons(); // Initialize icons
+            });
+
+            return (
+                <div className="flex-1 flex flex-col h-screen overflow-y-auto relative bg-white">
+                    {/* Top Navigation */}
+                    <div className="h-12 flex items-center justify-between px-4 sticky top-0 bg-white/80 backdrop-blur-sm z-10">
+                        <div className="flex items-center text-sm text-gray-600">
+                            <span className="hover:bg-gray-100 p-1 rounded cursor-pointer transition-colors">Workspace</span>
+                            <span className="mx-1 text-gray-400">/</span>
+                            <span className="flex items-center hover:bg-gray-100 p-1 rounded cursor-pointer transition-colors truncate max-w-[200px]">
+                                📝 과제 관리 시스템 구축
+                            </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <button className="text-sm text-gray-600 hover:bg-gray-100 px-2 py-1 rounded transition-colors">공유</button>
+                            <button className="text-sm text-gray-600 hover:bg-gray-100 p-1 rounded transition-colors">
+                                <i data-lucide="more-horizontal" className="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Content Area */}
+                    <div className="max-w-4xl w-full mx-auto px-12 pb-32">
+                        {/* Cover Area (Placeholder) */}
+                        <div className="h-40 w-full bg-gradient-to-r from-blue-100 to-purple-100 rounded-lg mt-4 mb-12 relative group">
+                            <button className="absolute bottom-2 right-2 bg-white/50 hover:bg-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm shadow-sm">
+                                커버 변경
+                            </button>
+                            {/* Icon */}
+                            <div className="absolute -bottom-10 left-8 text-6xl bg-white rounded-full w-20 h-20 flex items-center justify-center shadow-sm">
+                                📝
+                            </div>
+                        </div>
+
+                        {/* Title */}
+                        <div className="mt-14 mb-8">
+                            <h1 
+                                className="text-4xl font-bold text-[#37352f] outline-none block-placeholder placeholder-gray-300" 
+                                contentEditable="true" 
+                                data-placeholder="제목 없음"
+                            >과제 관리 시스템 구축</h1>
+                        </div>
+
+                        {/* Editor Blocks */}
+                        <div className="text-[#37352f] space-y-4">
+                            <p className="outline-none block-placeholder leading-relaxed" contentEditable="true" data-placeholder="'/'를 입력해 명령어를 확인하세요.">
+                                이번 프로젝트는 팀원들이 직관적으로 업무를 생성하고 추적할 수 있는 <strong>노션 스타일의 과제 관리 시스템</strong>을 구축하는 것입니다. 백엔드 없이 프론트엔드 단독으로 MVP를 구현합니다.
+                            </p>
+                            
+                            {/* Checkboxes */}
+                            <div className="space-y-1 my-4">
+                                <div className="flex items-start group">
+                                    <input type="checkbox" className="mt-1 mr-2 w-4 h-4 accent-blue-500 cursor-pointer rounded-sm border-gray-300" defaultChecked />
+                                    <p className="outline-none line-through text-gray-400" contentEditable="true">문서형 UX/UI 구조 설계</p>
+                                </div>
+                                <div className="flex items-start group">
+                                    <input type="checkbox" className="mt-1 mr-2 w-4 h-4 accent-blue-500 cursor-pointer rounded-sm border-gray-300" defaultChecked />
+                                    <p className="outline-none line-through text-gray-400" contentEditable="true">사이드바 및 네비게이션 구현</p>
+                                </div>
+                                <div className="flex items-start group">
+                                    <input type="checkbox" className="mt-1 mr-2 w-4 h-4 accent-blue-500 cursor-pointer rounded-sm border-gray-300" />
+                                    <p className="outline-none" contentEditable="true">상태 관리(상태 동기화) 연결</p>
+                                </div>
+                            </div>
+
+                            {/* Embedded Board */}
+                            <KanbanBoard />
+
+                            <p className="outline-none block-placeholder leading-relaxed text-gray-400 italic mt-8" contentEditable="true" data-placeholder="">
+                                추가 내용을 여기에 작성하세요...
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // App Entry
+        const App = () => {
+            return (
+                <div className="flex w-full h-screen">
+                    <Sidebar />
+                    <Editor />
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
